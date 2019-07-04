@@ -1,0 +1,1065 @@
+package adf.dao;
+
+import java.text.ParseException;
+import java.util.Hashtable;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;  
+import java.util.List;  
+import java.util.Properties;
+
+import javax.naming.Context;
+import javax.naming.NamingException;
+import javax.naming.directory.Attributes;  
+import javax.naming.directory.BasicAttribute;  
+import javax.naming.directory.BasicAttributes;  
+import javax.naming.directory.DirContext;  
+import javax.naming.directory.ModificationItem;  
+import javax.naming.ldap.InitialLdapContext;
+import javax.naming.ldap.LdapContext;
+
+import org.springframework.ldap.control.PagedResultsCookie;
+import org.springframework.ldap.control.PagedResultsRequestControl;
+import org.springframework.ldap.core.AttributesMapper;
+import org.springframework.ldap.core.AttributesMapperCallbackHandler;
+import org.springframework.ldap.core.CollectingNameClassPairCallbackHandler;
+import org.springframework.ldap.core.DirContextAdapter;
+import org.springframework.ldap.core.DirContextOperations;
+import org.springframework.ldap.core.DistinguishedName;  
+import org.springframework.ldap.core.LdapTemplate;  
+
+
+
+
+
+
+
+
+
+
+
+import javax.naming.ldap.InitialLdapContext;
+import javax.naming.ldap.LdapContext;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties; 
+
+import javax.naming.*;   
+import javax.naming.ldap.*;   
+import javax.naming.directory.*;
+
+import adf.entity.ADID;
+import adf.entity.ADPC;
+import adf.util.SimpleDateFormatDemo;
+
+import com.alibaba.fastjson.JSONObject;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.ldap.core.DistinguishedName;
+import org.springframework.ldap.core.LdapTemplate;
+
+public class ADIDDao {
+	
+	final static String keystore = "C:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	
+	private LdapContext ctx = null;  
+	
+	//注入spring的LdapTemplate，此处在spring的配置文件中需要配置  
+    private LdapTemplate ldapTemplate;  
+  
+    public LdapTemplate getLdapTemplate() {  
+        return ldapTemplate;  
+    }  
+    public void setLdapTemplate(LdapTemplate ldapTemplate) {  
+        this.ldapTemplate = ldapTemplate;  
+    } 
+
+    //禁用账号
+    @SuppressWarnings("unused")
+	public void sdPerson(String oneadid) throws UnsupportedEncodingException, NamingException  {  
+    	
+    	LdapContext ctx = null;
+    	//D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+	    Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");
+	    
+	    String[] attrObjectClassPerson = { "user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+
+        attr.put(objclass);  
+          
+        int UF_ACCOUNTDISABLE = 0x0002; //2  禁用账号
+	    int ADS_UF_PASSWORD_EXPIRED = 0x800000;
+	    int UF_NORMAL_ACCOUNT = 0x0200;   //512 账号正常
+	 
+	    try {
+			ctx = new InitialLdapContext(env, null);
+	            ModificationItem[] mods = new ModificationItem[1];//属性组别
+		   	    //账号状态设置
+	            mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,   
+			            new BasicAttribute("userAccountControl", Integer   
+			                    .toString(ADS_UF_PASSWORD_EXPIRED+UF_ACCOUNTDISABLE)));
+            ctx.modifyAttributes(oneadid, mods);
+            
+			} catch (NamingException e) {
+				e.printStackTrace();
+			}
+			ctx.close();  
+   	          
+    }
+    //移动cn的功能
+    public void changeOneAddn(String oldcnpath,String newcnpath){
+    	
+        LdapContext ctx = null;
+
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	             
+         try {
+        	  ctx = new InitialLdapContext(env, null);
+              ctx.rename(oldcnpath,newcnpath);
+              
+              System.out.println("旧的地址  :  "+oldcnpath+"  ====  ");
+              System.out.println("新的地址  :  "+newcnpath);
+              ctx.close();
+
+         } 
+         catch (NamingException e) {
+              System.err.println("错误信息: " + e);
+         }
+    	
+    }
+    //解锁重置密码
+    @SuppressWarnings("unused")
+	public void changePerson(String oneadid) throws UnsupportedEncodingException, NamingException  {  
+    	
+    	LdapContext ctx = null;
+    	//D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+	    Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");
+	    
+	    String[] attrObjectClassPerson = { "user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+
+        attr.put(objclass);  
+          
+        int UF_ACCOUNTDISABLE = 0x0002; //2  
+	    int UF_PASSWD_NOTREQD = 0x0020;   //32  不需要密码
+	    int UF_PASSWD_CANT_CHANGE = 0x0040;   //64 不能更改密码
+	    int UF_DONT_EXPIRE_PASSWD = 0x10000;   // 密码永不过期 66048
+	    int UF_PASSWORD_EXPIRED = 0x800000;   //8388608 密码过期 8388608 pwdLastSet    
+	    int ADS_UF_PASSWORD_EXPIRED = 0x800000;
+	    int UF_NORMAL_ACCOUNT = 0x0200;   //512
+	 
+	    try {
+			ctx = new InitialLdapContext(env, null);
+			
+           // Context result = ctx.createSubcontext(oneadid, attr); 
+   	        
+            ModificationItem[] mods = new ModificationItem[4];//属性组别
+	   	    String newQuotedPassword = "\"AAAaaa123456789\"";  //默认密码 
+	   	    byte[] newUnicodePassword = newQuotedPassword.getBytes("UTF-16LE");//默认密码设置 
+            mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE, new BasicAttribute("unicodePwd", newUnicodePassword));
+            //账号状态设置
+            mods[1] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,   
+		            new BasicAttribute("userAccountControl", Integer   
+		                    .toString(ADS_UF_PASSWORD_EXPIRED+UF_NORMAL_ACCOUNT)));
+            //账号第一次登陆必须改密码
+            mods[2] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                      new BasicAttribute("pwdLastSet", "0"));
+            mods[3] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("lockoutTime","0"));
+ 
+            ctx.modifyAttributes(oneadid, mods); 
+			} catch (NamingException e) {
+				
+				e.printStackTrace();
+				
+			}
+			ctx.close();  
+   	          
+    } 
+  //修改用户   姓 、名、 显示名称、 描述
+    @SuppressWarnings("unused")
+	public void changeOnePersonsxString(String userDn ,String description ,String postalCode,String company ,String department,String title ) throws UnsupportedEncodingException, NamingException  {  
+    	
+    	LdapContext ctx = null;
+    	//D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+	    Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");
+	    
+	    String[] attrObjectClassPerson = { "user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+
+        attr.put(objclass);  
+        //attr.put("sn", sn);//OU 和 姓 用来填写部门名称 
+        //attr.put("givenName",givenName);// 名字+ " "+ 工号
+        //显示名称 = 名字
+       // attr.put("displayName", displayName);  
+        //描述
+        attr.put("description", description);
+        
+        attr.put("postalCode", postalCode);
+        attr.put("company", company);
+        attr.put("department", department);
+        attr.put("title", title);
+
+	    try {
+			ctx = new InitialLdapContext(env, null);
+            ModificationItem[] mods = new ModificationItem[5];//属性组别
+            mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("description", description));
+            mods[1] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("postalCode", postalCode));
+            mods[2] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("company", company));
+            mods[3] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("department", department));
+            mods[4] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("title", title));
+ 
+            ctx.modifyAttributes(userDn, mods); 
+			} catch (NamingException e) {
+				
+				e.printStackTrace();
+				
+			}
+			ctx.close();  
+   	          
+    } 
+  //修改用户  站内信 邮箱地址 
+    @SuppressWarnings("unused")
+	public void changeOnePersonOaString(String userDn ,String physicalDeliveryOfficeName ,String office365,String sn,String givenName,String displayName) throws UnsupportedEncodingException, NamingException  {  
+    	
+    	LdapContext ctx = null;
+    	//D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+	    Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");
+	    
+	    String[] attrObjectClassPerson = { "user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+
+        attr.put(objclass);  
+        attr.put("sn", sn);
+        attr.put("givenName", givenName);
+        attr.put("displayName", displayName);
+        attr.put("physicalDeliveryOfficeName", physicalDeliveryOfficeName);
+        attr.put("Mail", office365);
+        attr.put("userPrincipalName", office365);
+	    try {
+			ctx = new InitialLdapContext(env, null);
+            ModificationItem[] mods = new ModificationItem[6];//属性组别
+            mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("physicalDeliveryOfficeName", physicalDeliveryOfficeName));
+            mods[1] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("Mail", office365));
+            mods[2] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("userPrincipalName", office365));
+            mods[3] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("sn", sn));
+            mods[4] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("givenName", givenName));
+            mods[5] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("displayName", displayName));
+ 
+            ctx.modifyAttributes(userDn, mods); 
+			} catch (NamingException e) {
+				
+				e.printStackTrace();
+				
+			}
+			ctx.close();  
+   	          
+    } 
+  //修改用户  站内信 邮箱地址 
+    /*@SuppressWarnings("unused")
+	public void changeOnePersonOaString(String userDn ,String cybozu ,String cybermail) throws UnsupportedEncodingException, NamingException  {  
+    	
+    	LdapContext ctx = null;
+    	//D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+	    Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");
+	    
+	    String[] attrObjectClassPerson = { "user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+
+        attr.put(objclass);  
+        attr.put("physicalDeliveryOfficeName", cybozu);
+        attr.put("Mail", cybermail);
+	    try {
+			ctx = new InitialLdapContext(env, null);
+            ModificationItem[] mods = new ModificationItem[2];//属性组别
+            mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("physicalDeliveryOfficeName", cybozu));
+            mods[1] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("Mail", cybermail));
+ 
+            ctx.modifyAttributes(userDn, mods); 
+			} catch (NamingException e) {
+				
+				e.printStackTrace();
+				
+			}
+			ctx.close();  
+   	          
+    } */
+    //修改用户  站内信 邮箱地址 
+    @SuppressWarnings("unused")
+	public void changeOnePersonOa(ADID adid) throws UnsupportedEncodingException, NamingException  {  
+    	
+    	LdapContext ctx = null;
+    	//D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+	    Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");
+	    
+	    String[] attrObjectClassPerson = { "user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+
+        attr.put(objclass);  
+        
+        //描述
+        //attr.put("description", adid.getDescription());
+        if (adid.getPhysicalDeliveryOfficeName() != null && adid.getPhysicalDeliveryOfficeName().length() > 0){
+        	//cybozu
+            attr.put("physicalDeliveryOfficeName", adid.getPhysicalDeliveryOfficeName());
+        }
+        if (adid.getMail() != null && adid.getMail().length() > 0){
+	        //cybermail
+	        attr.put("Mail", adid.getMail());
+        }
+
+	    try {
+			ctx = new InitialLdapContext(env, null);
+            ModificationItem[] mods = new ModificationItem[2];//属性组别
+            mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("physicalDeliveryOfficeName", adid.getPhysicalDeliveryOfficeName()));
+            mods[1] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                    new BasicAttribute("Mail", adid.getMail()));
+ 
+            ctx.modifyAttributes(adid.getUserDN(), mods); 
+			} catch (NamingException e) {
+				
+				e.printStackTrace();
+				
+			}
+			ctx.close();  
+   	          
+    } 
+    
+    //创建新用户
+    @SuppressWarnings("unused")
+	public void createOnePerson(ADID adid) throws UnsupportedEncodingException, NamingException  {  
+    	
+    	LdapContext ctx = null;
+    	//D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+	    Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");
+	    
+	    String[] attrObjectClassPerson = { "user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+
+        attr.put(objclass);  
+        
+        attr.put("sn", adid.getSn());//OU 和 姓 用来填写部门名称 
+        
+        attr.put("givenName",adid.getGivenName());// 名字+ " "+ 工号
+        
+        attr.put("cn", adid.getCn());//账号信息 按照规则填写
+        
+        //显示名称 = 名字
+        attr.put("displayName", adid.getDisplayName()); 
+        
+        attr.put("postalCode", adid.getPostalCode() );//工号  
+        
+        attr.put("company", adid.getCompany() );  //公司默认DYC
+        attr.put("department", adid.getDepartment() );  //部门
+        attr.put("title", adid.getTitle() );  //职务
+         
+        //描述
+        attr.put("description", adid.getDescription());
+        if (adid.getPhysicalDeliveryOfficeName() != null && adid.getPhysicalDeliveryOfficeName().length() > 0){
+        	//cybozu
+            attr.put("physicalDeliveryOfficeName", adid.getPhysicalDeliveryOfficeName());
+        }
+        if (adid.getMail() != null && adid.getMail().length() > 0){
+	        //cybermail
+	        attr.put("Mail", adid.getMail());
+        }
+        //用户名规则
+        //String userPrincipalName = adid.getCn()+"@dgyokowo.com";
+        String userPrincipalName = adid.getCn()+"@cn.yokowo.com";
+        attr.put("userPrincipalName", userPrincipalName);  
+        
+        attr.put("sAMAccountName", adid.getCn());  
+        //attr.put("objectClass", "user"); 
+            
+        int UF_ACCOUNTDISABLE = 0x0002; //2  
+	    int UF_PASSWD_NOTREQD = 0x0020;   //32  不需要密码
+	    int UF_PASSWD_CANT_CHANGE = 0x0040;   //64 不能更改密码
+	    int UF_DONT_EXPIRE_PASSWD = 0x10000;   // 密码永不过期 66048
+	    int UF_PASSWORD_EXPIRED = 0x800000;   //8388608 密码过期 8388608 pwdLastSet    
+	    int ADS_UF_PASSWORD_EXPIRED = 0x800000;
+	    int UF_NORMAL_ACCOUNT = 0x0200;   //512
+	 
+	    try {
+			ctx = new InitialLdapContext(env, null);
+			
+            Context result = ctx.createSubcontext(adid.getUserDN(), attr); 
+   	        
+            ModificationItem[] mods = new ModificationItem[3];//属性组别
+	   	    String newQuotedPassword = "\"AAAaaa123456789\"";  //默认密码 
+	   	    byte[] newUnicodePassword = newQuotedPassword.getBytes("UTF-16LE");//默认密码设置 
+            mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE, new BasicAttribute("unicodePwd", newUnicodePassword));
+            //账号状态设置
+            mods[1] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,   
+		            new BasicAttribute("userAccountControl", Integer   
+		                    .toString(ADS_UF_PASSWORD_EXPIRED+UF_NORMAL_ACCOUNT)));
+            //账号第一次登陆必须改密码
+            mods[2] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                      new BasicAttribute("pwdLastSet", "0"));
+ 
+            ctx.modifyAttributes(adid.getUserDN(), mods); 
+			} catch (NamingException e) {
+				
+				e.printStackTrace();
+				
+			}
+			ctx.close();  
+   	          
+    } 
+    
+    //全局关闭
+    public void closeLdap(){  
+        try {  
+            this.ctx.close();  
+        } catch (NamingException e) { 
+            e.printStackTrace();  
+        }  
+    } 
+    // 查询单个用户
+   @SuppressWarnings("unchecked")
+   public List<ADID> getPersonDetail(String name)throws Exception {  
+	   String searchFilter = "(&(objectClass=user)(cn=*" + name + "*))";
+	   ADID adid = new ADID();
+	   //OU=dgUser
+	   List<ADID> adidlist = ldapTemplate.search("", searchFilter, new AttributesMapper() {
+		   
+			public Object mapFromAttributes(Attributes attributes)  {
+				ADID adid = new ADID();
+				try {
+					
+				if (attributes.get("cn") != null ){
+					adid.setCn((String)attributes.get("cn").get());
+				}
+				if (attributes.get("givenName") != null){
+					adid.setGivenName((String)attributes.get("givenName").get());
+				}
+				if (attributes.get("displayName") != null){
+					adid.setDisplayName((String)attributes.get("displayName").get());
+				}
+				if (attributes.get("sn") != null) {  
+					adid.setSn((String) attributes.get("sn").get());
+		            
+		        }if (attributes.get("description") != null) {  
+		        	adid.setDescription((String) attributes.get("description").get());
+		            
+		        }if (attributes.get("physicalDeliveryOfficeName") != null) {  
+		        	adid.setPhysicalDeliveryOfficeName((String) attributes.get("physicalDeliveryOfficeName").get());
+		            
+		        }if (attributes.get("Mail") != null) {  
+		        	adid.setMail((String) attributes.get("Mail").get());
+		            
+		        }if (attributes.get("userPrincipalName") != null) {  
+		        	adid.setUserPrincipalName((String) attributes.get("userPrincipalName").get());
+		            
+		        }if (attributes.get("sAMAccountName") != null) {  
+		        	adid.setsAMAccountName((String) attributes.get("sAMAccountName").get());
+		        }//获取用户完整地址
+		        if (attributes.get("distinguishedName") != null) {  
+		        	adid.setUserDN((String) attributes.get("distinguishedName").get());
+		        }if (attributes.get("whenCreated") != null) {  
+		        	String otime = (String)attributes.get("whenCreated").get().toString().subSequence(0, 14);
+		        	String changetime =(String)otime.subSequence(0, 4)+"-"+(String)otime.subSequence(4,6)+"-"+(String)otime.subSequence(6,8);
+		        	adid.setWhenCreated(changetime); 
+		         }
+		        
+				} catch (NamingException e) {
+					
+					e.printStackTrace();
+				}
+				return adid;
+			}
+		});
+		adidlist.add(adid);
+		return adidlist;
+    }
+   // 查询禁用的单个用户
+   @SuppressWarnings("unchecked")
+   public List<ADID> getsdPersonDetail(String name)throws Exception {  
+	   String searchFilter = "(&(objectClass=user)(cn=*" + name + "*))";
+	   ADID adid = new ADID();
+	   List<ADID> adidlist = ldapTemplate.search("OU=dgDisableUser", searchFilter, new AttributesMapper() {
+		   
+			public Object mapFromAttributes(Attributes attributes)  {
+				ADID adid = new ADID();
+				try {
+					
+				if (attributes.get("cn") != null ){
+					adid.setCn((String)attributes.get("cn").get());
+				}
+				if (attributes.get("givenName") != null){
+					adid.setGivenName((String)attributes.get("givenName").get());
+				}
+				if (attributes.get("displayName") != null){
+					adid.setDisplayName((String)attributes.get("displayName").get());
+				}
+				if (attributes.get("sn") != null) {  
+					adid.setSn((String) attributes.get("sn").get());
+		            
+		        }if (attributes.get("description") != null) {  
+		        	adid.setDescription((String) attributes.get("description").get());
+		            
+		        }if (attributes.get("physicalDeliveryOfficeName") != null) {  
+		        	adid.setPhysicalDeliveryOfficeName((String) attributes.get("physicalDeliveryOfficeName").get());
+		            
+		        }if (attributes.get("Mail") != null) {  
+		        	adid.setMail((String) attributes.get("Mail").get());
+		            
+		        }if (attributes.get("userPrincipalName") != null) {  
+		        	adid.setUserPrincipalName((String) attributes.get("userPrincipalName").get());
+		            
+		        }if (attributes.get("sAMAccountName") != null) {  
+		        	adid.setsAMAccountName((String) attributes.get("sAMAccountName").get());
+		        }//获取用户完整地址
+		        if (attributes.get("distinguishedName") != null) {  
+		        	adid.setUserDN((String) attributes.get("distinguishedName").get());
+		        }if (attributes.get("whenCreated") != null) {  
+		        	String otime = (String)attributes.get("whenCreated").get().toString().subSequence(0, 14);
+		        	String changetime =(String)otime.subSequence(0, 4)+"-"+(String)otime.subSequence(4,6)+"-"+(String)otime.subSequence(6,8);
+		        	adid.setWhenCreated(changetime); 
+		         }
+		        
+				} catch (NamingException e) {
+					
+					e.printStackTrace();
+				}
+				return adid;
+			}
+		});
+		adidlist.add(adid);
+		return adidlist;
+    }
+	//测试用
+    public DistinguishedName getDn(String cn) {  
+        //得到根目录，也就是配置文件中配置的ldap的根目录  
+        DistinguishedName newContactDN = new DistinguishedName();  
+        // 添加cn，即使得该条记录的dn为"cn=cn,根目录",例如"cn=abc,dc=testdc,dc=com"  
+        newContactDN.add("cn", cn); 
+        System.out.println(newContactDN);
+        return newContactDN;  
+    }
+    
+    //查询所有不分页测试用
+    @SuppressWarnings("unchecked")
+	public List<ADID> getPersons() throws Exception {
+		String filter = "(&(objectclass=user)(objectclass=person)(objectclass=top))";
+		ADID adid = new ADID();
+		List<ADID> adidlist = ldapTemplate.search("OU=dgUser", filter, new AttributesMapper() {
+			public Object mapFromAttributes(Attributes attributes) throws NamingException {
+				ADID adid = new ADID();
+
+				if (attributes.get("cn") != null){
+					adid.setCn((String)attributes.get("cn").get());
+				}
+				if (attributes.get("givenName") != null){
+					adid.setGivenName((String)attributes.get("givenName").get());
+				}
+				if (attributes.get("postalCode") != null){
+					adid.setPostalCode((String)attributes.get("postalCode").get().toString().substring(2));
+				}
+				if (attributes.get("company") != null){
+					adid.setCompany((String)attributes.get("company").get());
+				}
+				if (attributes.get("department") != null){
+					adid.setDepartment((String)attributes.get("department").get());
+				}
+				if (attributes.get("title") != null){
+					adid.setTitle((String)attributes.get("title").get());
+				}
+				if (attributes.get("displayName") != null){
+					adid.setDisplayName((String)attributes.get("displayName").get());
+				}
+				if (attributes.get("sn") != null) {  
+					adid.setSn((String) attributes.get("sn").get());
+		            
+		        }if (attributes.get("description") != null) {  
+		        	adid.setDescription((String) attributes.get("description").get());
+		            
+		        }if (attributes.get("physicalDeliveryOfficeName") != null) {  
+		        	adid.setPhysicalDeliveryOfficeName((String) attributes.get("physicalDeliveryOfficeName").get());
+		            
+		        }if (attributes.get("Mail") != null) {  
+		        	adid.setMail((String) attributes.get("Mail").get());
+		            
+		        }if (attributes.get("userPrincipalName") != null) {  
+		        	adid.setUserPrincipalName((String) attributes.get("userPrincipalName").get());
+		            
+		        }if (attributes.get("sAMAccountName") != null) {  
+		        	adid.setsAMAccountName((String) attributes.get("sAMAccountName").get());
+		        }if (attributes.get("whenCreated") != null) {  
+		        	String otime = (String)attributes.get("whenCreated").get().toString().subSequence(0, 14);
+		        	String changetime =(String)otime.subSequence(0, 4)+"-"+(String)otime.subSequence(4,6)+"-"+(String)otime.subSequence(6,8);
+		        	//System.out.println();
+		        	adid.setWhenCreated(changetime); 
+		         }
+				return adid;
+			}
+		});
+		adidlist.add(adid);
+		return adidlist;
+	}
+    
+    //查询所有不分页测试用
+    @SuppressWarnings("unchecked")
+	public List<ADID> getSDPersons() throws Exception {
+		String filter = "(&(objectclass=user)(objectclass=person)(objectclass=top))";
+		ADID adid = new ADID();
+		List<ADID> adidlist = ldapTemplate.search("OU=dgDisableUser", filter, new AttributesMapper() {
+			public Object mapFromAttributes(Attributes attributes) throws NamingException {
+				ADID adid = new ADID();
+
+				if (attributes.get("cn") != null){
+					adid.setCn((String)attributes.get("cn").get());
+				}
+				if (attributes.get("givenName") != null){
+					adid.setGivenName((String)attributes.get("givenName").get());
+				}
+				if (attributes.get("postalCode") != null){
+					adid.setPostalCode((String)attributes.get("postalCode").get());
+				}
+				if (attributes.get("company") != null){
+					adid.setCompany((String)attributes.get("company").get());
+				}
+				if (attributes.get("department") != null){
+					adid.setDepartment((String)attributes.get("department").get());
+				}
+				if (attributes.get("title") != null){
+					adid.setTitle((String)attributes.get("title").get());
+				}
+				if (attributes.get("displayName") != null){
+					adid.setDisplayName((String)attributes.get("displayName").get());
+				}
+				if (attributes.get("sn") != null) {  
+					adid.setSn((String) attributes.get("sn").get());
+		            
+		        }if (attributes.get("description") != null) {  
+		        	adid.setDescription((String) attributes.get("description").get());
+		            
+		        }if (attributes.get("physicalDeliveryOfficeName") != null) {  
+		        	adid.setPhysicalDeliveryOfficeName((String) attributes.get("physicalDeliveryOfficeName").get());
+		            
+		        }if (attributes.get("Mail") != null) {  
+		        	adid.setMail((String) attributes.get("Mail").get());
+		            
+		        }if (attributes.get("userPrincipalName") != null) {  
+		        	adid.setUserPrincipalName((String) attributes.get("userPrincipalName").get());
+		            
+		        }if (attributes.get("sAMAccountName") != null) {  
+		        	adid.setsAMAccountName((String) attributes.get("sAMAccountName").get());
+		        }if (attributes.get("whenCreated") != null) {  
+		        	String otime = (String)attributes.get("whenCreated").get().toString().subSequence(0, 14);
+		        	String changetime =(String)otime.subSequence(0, 4)+"-"+(String)otime.subSequence(4,6)+"-"+(String)otime.subSequence(6,8);
+		        	//System.out.println();
+		        	adid.setWhenCreated(changetime); 
+		         }
+				return adid;
+			}
+		});
+		adidlist.add(adid);
+		return adidlist;
+	}
+    //更改电脑描述
+    public void changeOnePCdescription(String dn,String description){
+    	LdapContext ctx = null;
+    	
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	    
+    	Attributes attr = new BasicAttributes(true);  
+	    Attribute objclass = new BasicAttribute("objectclass");    
+	    String[] attrObjectClassPerson = { "computer","user", "organizationalPerson", "person", "top" };
+		Arrays.sort(attrObjectClassPerson);
+		for (String ocp : attrObjectClassPerson) {
+			objclass.add(ocp);
+		}
+        attr.put(objclass);  
+        attr.put("description", description);
+        ModificationItem[] mods = new ModificationItem[1];
+        mods[0] = new ModificationItem(DirContext.REPLACE_ATTRIBUTE,
+                new BasicAttribute("description", description));
+        try {
+        	
+        	ctx = new InitialLdapContext(env, null);
+            
+			ctx.modifyAttributes(dn, mods);
+		} catch (NamingException e) {
+			
+			e.printStackTrace();
+		}
+
+        
+    }
+    //具体化实体类
+    private class PersonAttributesMapper implements AttributesMapper {
+        public Object mapFromAttributes(Attributes attrs) throws NamingException {
+        	/*Person adid = new Person();
+           adid.setCn((String)attrs.get("cn").get());
+           if (attrs.get("sn").get() != null){ 
+           adid.setSn((String)attrs.get("sn").get());
+           }if (attrs.get("description").get() != null){ 
+           adid.setDescription((String)attrs.get("description").get());
+           }*/
+           return null;
+        }
+     }
+    //调用返回实体类
+     public List getAllPersons() {
+        return ldapTemplate.search("", "(&(objectclass=user)(objectclass=person)(objectclass=top))", new PersonAttributesMapper());
+     }
+    //查询单个cn
+    public List getAllPersonNames() {
+        return ldapTemplate.search(
+           "", "(objectclass=person)",
+           new AttributesMapper() {
+              public Object mapFromAttributes(Attributes attrs)
+                 throws NamingException {
+                 return attrs.get("cn").get();
+              }
+           });
+     }
+    //移动cn的功能
+    public void changeOnePCdn(String oldcnpath,String newcnpath){
+    	
+        LdapContext ctx = null;
+        //String oldUserpath = "CN="+cn+","+"CN=Computers,DC=dgyokowo,DC=com";
+        //String newUserpath = "CN="+cn+","+"OU=总务部,OU=dgPC,DC=dgyokowo,DC=com";
+    	//String keystore = "D:\\Java\\jdk1.7.0_45\\jre\\lib\\security\\cacerts_hf"; 
+	    System.setProperty("javax.net.ssl.trustStore", keystore);
+	    System.setProperty("javax.net.ssl.trustStorePassword", ""); 
+	    Properties env = new Properties();  
+	    env.put(Context.INITIAL_CONTEXT_FACTORY,  
+	            "com.sun.jndi.ldap.LdapCtxFactory");  
+	    env.put(Context.PROVIDER_URL, "ldap://x.x.x.x:636/");  
+	    env.put(Context.SECURITY_AUTHENTICATION, "simple");  
+	    env.put(Context.SECURITY_PRINCIPAL,  
+	            "xxx@dxxx.com");  
+	    env.put(Context.SECURITY_CREDENTIALS, "Youhua2014");  
+	    env.put(Context.SECURITY_PROTOCOL, "ssl");  
+	             
+         try {
+        	  ctx = new InitialLdapContext(env, null);
+              ctx.rename(oldcnpath,newcnpath);
+              System.out.println("旧的地址  :  "+oldcnpath+"  ====  ");
+              System.out.println("新的地址  :  "+newcnpath);
+              ctx.close();
+
+         } 
+         catch (NamingException e) {
+              System.err.println("错误信息: " + e);
+         }
+    	
+    }
+    //查询单个PC
+    @SuppressWarnings("unchecked")
+	public List<ADPC> getOnePc(String pcname) throws Exception {
+		String filter = "(&(objectCategory=Computer)(objectClass=computer)(cn=*" + pcname + "*))";
+		ADPC adpc = new ADPC();
+		List<ADPC> pcslist = ldapTemplate.search("", filter, new AttributesMapper() {
+			public Object mapFromAttributes(Attributes attributes) throws NamingException {
+				ADPC adpc = new ADPC();
+
+				if (attributes.get("cn") != null){
+					adpc.setCn((String)attributes.get("cn").get());
+				}
+			    //描述好多是空值
+				if (attributes.get("description") != null){
+		        adpc.setDescription((String) attributes.get("description").get());  
+				}
+				if (attributes.get("distinguishedName") != null){
+					adpc.setDN((String)attributes.get("distinguishedName").get());
+				}
+				if (attributes.get("distinguishedName") != null){
+					String ous[] = attributes.get("distinguishedName").get().toString().split(",",4);
+					String ou = ous[1].substring(3).toString();
+					adpc.setOU(ou);
+				}
+				if (attributes.get("operatingSystem") != null){
+					adpc.setOperatingSystem((String)attributes.get("operatingSystem").get());
+				}
+				if (attributes.get("operatingSystemVersion") != null) {  
+					adpc.setOperatingSystemVersion((String) attributes.get("operatingSystemVersion").get());
+		            
+		        }if (attributes.get("logonCount") != null) {  
+		        	adpc.setLogonCount((String) attributes.get("logonCount").get());
+		            
+		        }if (attributes.get("lastLogon") != null) { 
+		        	SimpleDateFormatDemo sdf = new SimpleDateFormatDemo();
+		        	try {
+						@SuppressWarnings("static-access")
+						String lastlogon = sdf.LastLogontoDate( attributes.get("lastLogon").get().toString());
+						adpc.setLastLogon(lastlogon);
+		        	} catch (ParseException e) {
+						e.printStackTrace();
+					}
+		        }if (attributes.get("whenCreated") != null) {  
+		        	String otime = (String)attributes.get("whenCreated").get().toString().subSequence(0, 14);
+		        	String changetime =(String)otime.subSequence(0, 4)+"-"+(String)otime.subSequence(4,6)+"-"+(String)otime.subSequence(6,8);
+		        	adpc.setWhenCreated(changetime); 
+		         }
+				return adpc;
+			}
+		});
+		pcslist.add(adpc);
+		return pcslist;
+	}
+
+    //查询所有不分页测试用
+    @SuppressWarnings("unchecked")
+	public List<ADPC> getPc() throws Exception {
+		String filter = "(&(objectCategory=Computer)(objectClass=computer)(name=*))";
+		ADPC adpc = new ADPC();
+		List<ADPC> pcslist = ldapTemplate.search("OU=dgPC", filter, new AttributesMapper() {
+			public Object mapFromAttributes(Attributes attributes) throws NamingException {
+				ADPC adpc = new ADPC();
+
+				if (attributes.get("cn") != null){
+					adpc.setCn((String)attributes.get("cn").get());
+				}
+			    //描述好多是空值
+				if (attributes.get("description") != null){
+		        adpc.setDescription((String) attributes.get("description").get());  
+				}
+				if (attributes.get("distinguishedName") != null){
+					adpc.setDN((String)attributes.get("distinguishedName").get());
+				}
+				if (attributes.get("distinguishedName") != null){
+					String ous[] = attributes.get("distinguishedName").get().toString().split(",",4);
+					String ou = ous[1].substring(3).toString();
+					adpc.setOU(ou);
+				}
+				if (attributes.get("operatingSystem") != null){
+					adpc.setOperatingSystem((String)attributes.get("operatingSystem").get());
+				}
+				if (attributes.get("operatingSystemVersion") != null) {  
+					adpc.setOperatingSystemVersion((String) attributes.get("operatingSystemVersion").get());
+		            
+		        }if (attributes.get("logonCount") != null) {  
+		        	adpc.setLogonCount((String) attributes.get("logonCount").get());
+		            
+		        }if (attributes.get("lastLogon") != null) { 
+		        	SimpleDateFormatDemo sdf = new SimpleDateFormatDemo();
+		        	try {
+						@SuppressWarnings("static-access")
+						String lastlogon = sdf.LastLogontoDate( attributes.get("lastLogon").get().toString());
+						adpc.setLastLogon(lastlogon);
+		        	} catch (ParseException e) {
+						e.printStackTrace();
+					}
+		        }if (attributes.get("whenCreated") != null) {  
+		        	String otime = (String)attributes.get("whenCreated").get().toString().subSequence(0, 14);
+		        	String changetime =(String)otime.subSequence(0, 4)+"-"+(String)otime.subSequence(4,6)+"-"+(String)otime.subSequence(6,8);
+		        	adpc.setWhenCreated(changetime); 
+		         }
+				return adpc;
+			}
+		});
+		pcslist.add(adpc);
+		return pcslist;
+	}
+  //查询所有不分页测试用
+    @SuppressWarnings("unchecked")
+	public List<ADPC> getOthPc() throws Exception {
+		String filter = "(&(objectCategory=Computer)(objectClass=computer)(name=*))";
+		ADPC adpc = new ADPC();
+		List<ADPC> pcslist = ldapTemplate.search("OU=dgOtherPC", filter, new AttributesMapper() {
+			public Object mapFromAttributes(Attributes attributes) throws NamingException {
+				ADPC adpc = new ADPC();
+
+				if (attributes.get("cn") != null){
+					adpc.setCn((String)attributes.get("cn").get());
+				}
+			    //描述好多是空值
+				if (attributes.get("description") != null){
+		        adpc.setDescription((String) attributes.get("description").get());  
+				}
+				if (attributes.get("distinguishedName") != null){
+					adpc.setDN((String)attributes.get("distinguishedName").get());
+				}
+				if (attributes.get("distinguishedName") != null){
+					String ous[] = attributes.get("distinguishedName").get().toString().split(",",4);
+					String ou = ous[1].substring(3).toString();
+					adpc.setOU(ou);
+				}
+				if (attributes.get("operatingSystem") != null){
+					adpc.setOperatingSystem((String)attributes.get("operatingSystem").get());
+				}
+				if (attributes.get("operatingSystemVersion") != null) {  
+					adpc.setOperatingSystemVersion((String) attributes.get("operatingSystemVersion").get());
+		            
+		        }if (attributes.get("logonCount") != null) {  
+		        	adpc.setLogonCount((String) attributes.get("logonCount").get());
+		            
+		        }if (attributes.get("lastLogon") != null) { 
+		        	SimpleDateFormatDemo sdf = new SimpleDateFormatDemo();
+		        	try {
+						@SuppressWarnings("static-access")
+						String lastlogon = sdf.LastLogontoDate( attributes.get("lastLogon").get().toString());
+						adpc.setLastLogon(lastlogon);
+		        	} catch (ParseException e) {
+						e.printStackTrace();
+					}
+		        }if (attributes.get("whenCreated") != null) {  
+		        	String otime = (String)attributes.get("whenCreated").get().toString().subSequence(0, 14);
+		        	String changetime =(String)otime.subSequence(0, 4)+"-"+(String)otime.subSequence(4,6)+"-"+(String)otime.subSequence(6,8);
+		        	adpc.setWhenCreated(changetime); 
+		         }
+				return adpc;
+			}
+		});
+		pcslist.add(adpc);
+		return pcslist;
+	}
+}
