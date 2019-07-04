@@ -1,0 +1,114 @@
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.io.FileWriter;
+import java.util.Enumeration;
+import java.util.Properties;
+import javax.naming.Context;
+import javax.naming.NamingEnumeration;
+import javax.naming.NamingException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+import javax.naming.ldap.InitialLdapContext;
+import javax.naming.ldap.LdapContext;
+
+public class LdapTestPC {
+	
+	@SuppressWarnings("static-access")
+	public static void main(String[] args) throws Exception  {
+		SimpleDateFormatDemo sdf = new SimpleDateFormatDemo();
+		Properties env = new Properties();
+		String adminName = "xxx@xxx.com";// username@domain
+		String adminPassword = "Yxxx";// password
+		String ldapURL = "LDAP://ipaddress:389";// ip:port
+		env.put(Context.INITIAL_CONTEXT_FACTORY,
+				"com.sun.jndi.ldap.LdapCtxFactory");
+		env.put(Context.SECURITY_AUTHENTICATION, "simple");// "none","simple","strong"
+		env.put(Context.SECURITY_PRINCIPAL, adminName);
+		env.put(Context.SECURITY_CREDENTIALS, adminPassword);
+		env.put(Context.PROVIDER_URL, ldapURL);
+		try {
+			LdapContext ctx = new InitialLdapContext(env, null);
+			SearchControls searchCtl0 = new SearchControls();
+			SearchControls searchCtl1 = new SearchControls();
+			searchCtl0.setSearchScope(SearchControls.SUBTREE_SCOPE);
+			searchCtl1.setSearchScope(SearchControls.SUBTREE_SCOPE);
+			String searchFilter = "(&(objectCategory=Computer)(objectClass=computer)(name=*))";
+			String searchBase = "OU=dgPC,DC=xxx,DC=com";
+			
+			String returnedAtt0[] = { "memberOf" ,"cn","description","distinguishedName","whenCreated","whenChanged",
+					"name","lastLogon","pwdLastSet","logonCount","operatingSystem","operatingSystemVersion","dSCorePropagationData","lastLogonTimestamp"};
+			String returnedAtt1[] = { "lastLogon"};
+			searchCtl0.setReturningAttributes(returnedAtt0);
+			searchCtl1.setReturningAttributes(returnedAtt1);
+			FileWriter fw1 = new FileWriter("d:\\dgPC01.txt");
+			NamingEnumeration<SearchResult> answer0 = ctx.search(searchBase,
+					searchFilter, searchCtl0);
+			NamingEnumeration<SearchResult> answer1 = ctx.search(searchBase,
+					searchFilter, searchCtl1);
+			int  a = 0;
+			while (answer0.hasMoreElements()&&answer1.hasMoreElements()) {
+				a++;
+				SearchResult sr0 = (SearchResult) answer0.next();
+				SearchResult sr1 = (SearchResult) answer1.next();
+				Attributes Attrs1 = sr1.getAttributes();
+				
+				String v1 ="";
+				String t1 ="";
+				if (Attrs1 != null) {
+					
+	                NamingEnumeration<?> ne = Attrs1.getAll();
+	                
+	                while(ne.hasMore()) {
+	                    Attribute Attr = (Attribute)ne.next();
+	                    Enumeration<?> value1 = Attr.getAll();
+	                  
+	                    if (value1 != null) { // 迭代
+	                    	
+	                        while (value1.hasMoreElements()) {
+	                            String value = null ;
+	                           
+	                                value = (String) value1.nextElement();
+	                         
+	                                v1=value;
+	                        }
+	                    }
+	                }
+	            }
+				try{
+					if(v1 != null){t1=sdf.LastLogontoDate(v1);}
+					else{ t1="";}
+					
+					}
+				catch (NumberFormatException e){e.printStackTrace();}
+				
+				
+				
+				
+				
+				
+				
+				
+				System.out.println( sr0.getAttributes().get("whenCreated").toString().substring(0, 21)+","+sr1.getName()+","+"最后登录时间,"+t1+","+sr0.getAttributes().get("operatingSystem")+
+						","+sr0.getAttributes().get("operatingSystemVersion")
+						);
+				//System.out.println("<<<::[" + sr.getName() + "      URL:    " + sr.getNameInNamespace() +"]::>>>>");
+				System.out.println("一共循环了 ："+a +"次");
+				fw1.write(sr0.getAttributes().get("whenCreated").toString().substring(0, 21)+","+sr1.getName()+","+sr0.getAttributes().get("name")+","+"最后登录时间,"+t1+","+sr0.getAttributes().get("operatingSystem")+","
+				+sr0.getAttributes().get("operatingSystemVersion")+","+"\r\n");
+			}
+			
+			fw1.close();
+			
+			ctx.close();
+		} catch (NamingException e) {
+			e.printStackTrace();
+			System.err.println("Problem searching directory: " + e);
+		}
+	}
+	
+}
+
